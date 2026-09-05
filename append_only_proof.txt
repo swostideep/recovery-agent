@@ -1,0 +1,19 @@
+Tamper-evidence proof — audit_log is append-only, enforced by SQLite triggers
+(policy.md A2). Reproduce with: sqlite3 data/recovery.db < schema.sql
+
+$ sqlite3 data/recovery.db "INSERT INTO audit_log VALUES(1,'r','t','X',NULL,NULL,'{}','0','h');"
+  exit=0                                    <- append is allowed
+
+$ sqlite3 data/recovery.db "UPDATE audit_log SET ts='hacked';"
+Error: stepping, audit_log is append-only: UPDATE forbidden (19)
+  exit=19                                   <- blocked by the database
+
+$ sqlite3 data/recovery.db "DELETE FROM audit_log;"
+Error: stepping, audit_log is append-only: DELETE forbidden (19)
+  exit=19                                   <- blocked by the database
+
+$ sqlite3 data/recovery.db "SELECT seq, run_id, ts, event_type FROM audit_log;"
+1|r|t|X                                     <- ts is still 't', not 'hacked'
+
+The row survived both tamper attempts unchanged. The guarantee is in the
+schema, not in application convention.
