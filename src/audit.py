@@ -11,8 +11,9 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 
-DB_PATH = "data/recovery.db"
-SCHEMA_PATH = "schema.sql"
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DB_PATH = os.path.join(_ROOT, "data", "recovery.db")
+SCHEMA_PATH = os.path.join(_ROOT, "schema.sql")
 GENESIS_HASH = "0" * 64
 
 
@@ -23,6 +24,9 @@ def get_conn(path=DB_PATH):
     every FK in schema.sql is decorative and orphan rows are accepted (A3).
     """
     conn = sqlite3.connect(path)
+    # Autocommit: append_event() drives its own BEGIN IMMEDIATE, which cannot
+    # start inside the implicit transaction sqlite3 opens on any INSERT.
+    conn.isolation_level = None
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
     return conn
