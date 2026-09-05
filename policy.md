@@ -1,4 +1,4 @@
-# Recovery Policy — v1.1
+# Recovery Policy — v1.2
 
 Merchant: "Kettle & Co", D2C ecommerce (India). AOV ~₹2,400.
 Actor: automated recovery agent. All amounts in paise (integers).
@@ -42,6 +42,12 @@ Failures are classified into exactly one class before any action is considered.
   exists, the payment goes terminal with `expired`.
 - **P3** Every clamp or precedence resolution is logged as its own
   policy_checks row with rule_id `P2` and both rule IDs named in the reason.
+- **P4** The policy engine returns exactly one of `allow` | `deny` | `clamp`.
+  It may NOT substitute the action type. `clamp` narrows a parameter of the
+  proposed action only (the P2 time clamp), never changes what the action is.
+  On deny, the agent may re-propose: max 2 re-proposals per attempt, then
+  ESCALATE_HUMAN. Every proposal is its own decisions row. The ctx passed to
+  the engine strips latent state and is passed explicitly.
 
 ## 4. Bounded limits (B)
 
@@ -50,7 +56,8 @@ Failures are classified into exactly one class before any action is considered.
 - **B3** No action executes 21:00–09:00 IST. Defer to 09:05 IST.
 - **B4** No attempt more than 72h after original failure. After 72h → STOP.
 - **B5** Amount > ₹25,000 → propose only, ESCALATE_HUMAN. Never auto-execute.
-- **B6** Max 500 actions per run. Exceeding this halts the run.
+- **B6** Max actions per run, configurable, default 1000. Exceeding this
+  halts the run.
 
 ## 5. Gating by class (G)
 
