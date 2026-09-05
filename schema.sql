@@ -90,6 +90,24 @@ CREATE TABLE IF NOT EXISTS exceptions (
     occurred_at   TEXT NOT NULL
 );
 
+-- Observable issuer health. Written by the simulator, readable by the agent.
+-- estimated_recovery_at is deliberately noisy: it is an estimate, not truth.
+-- The agent must NEVER read latent_json; this table is its only health signal.
+CREATE TABLE IF NOT EXISTS issuer_health (
+    snapshot_id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id        TEXT NOT NULL REFERENCES runs(run_id),
+    issuer        TEXT NOT NULL,
+    method        TEXT NOT NULL,
+    observed_at   TEXT NOT NULL,
+    status        TEXT NOT NULL CHECK (status IN ('healthy','degraded','down')),
+    success_rate  REAL NOT NULL,
+    estimated_recovery_at TEXT,
+    UNIQUE (run_id, issuer, method, observed_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_health_lookup
+    ON issuer_health(run_id, issuer, method, observed_at);
+
 -- Append-only, hash-chained. row_hash = sha256(seq|run_id|ts|event_type|payload_json|prev_hash)
 CREATE TABLE IF NOT EXISTS audit_log (
     seq          INTEGER PRIMARY KEY AUTOINCREMENT,

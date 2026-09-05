@@ -1,19 +1,38 @@
-Tamper-evidence proof — audit_log is append-only, enforced by SQLite triggers
-(policy.md A2). Reproduce with: sqlite3 data/recovery.db < schema.sql
+Tamper-evidence proof — audit_log integrity (policy.md A2, A3).
+Reproduce: sqlite3 data/recovery.db < schema.sql
+
+--- 1. The database refuses to rewrite history -----------------------------
 
 $ sqlite3 data/recovery.db "INSERT INTO audit_log VALUES(1,'r','t','X',NULL,NULL,'{}','0','h');"
   exit=0                                    <- append is allowed
 
 $ sqlite3 data/recovery.db "UPDATE audit_log SET ts='hacked';"
 Error: stepping, audit_log is append-only: UPDATE forbidden (19)
-  exit=19                                   <- blocked by the database
 
 $ sqlite3 data/recovery.db "DELETE FROM audit_log;"
 Error: stepping, audit_log is append-only: DELETE forbidden (19)
-  exit=19                                   <- blocked by the database
 
-$ sqlite3 data/recovery.db "SELECT seq, run_id, ts, event_type FROM audit_log;"
-1|r|t|X                                     <- ts is still 't', not 'hacked'
+$ sqlite3 data/recovery.db "SELECT ts FROM audit_log;"
+t                                           <- not 'hacked'. Row survived.
 
-The row survived both tamper attempts unchanged. The guarantee is in the
-schema, not in application convention.
+--- 2. Triggers allow INSERT, so the hash chain covers the real attack ------
+
+A forged row appended directly to the log is NOT blocked by the triggers.
+verify_integrity() catches it twice over:
+
+  DETECTED: seq 4: chain broken, prev_hash deadbeef... does not match
+            previous row cab49d653d49...
+  DETECTED: seq 4: row_hash mismatch, stored fakehash... recomputed
+            168cd8bfba4e... (row was altered)
+
+--- 3. Foreign keys are enforced, not decorative ---------------------------
+
+PRAGMA foreign_keys is per-connection and defaults to OFF. Before the fix,
+a decision referencing a non-existent payment was accepted silently:
+
+  before:  ORPHAN ACCEPTED - FKs are off by default
+  after:   blocked: FOREIGN KEY constraint failed
+
+Every connection goes through audit.get_conn(), which sets the pragma.
+verify_integrity() re-checks for orphans at the end of every run and also
+asserts the pragma is on, so the guarantee cannot silently regress.
