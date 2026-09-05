@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Payment Recovery Agent</title>
+<style>
+:root{color-scheme:light;--bg:#f4f4f2;--surface:#fcfcfb;--line:#e2e1dc;
+--ink:#0b0b0b;--ink2:#52514e;--ink3:#7a7975;--ok:#008300;--bad:#e34948;}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+--bg:#111110;--surface:#1a1a19;--line:#33322f;--ink:#fff;--ink2:#c3c2b7;
+--ink3:#8e8d85;--ok:#4caf50;--bad:#e66767;color-scheme:dark;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:14px/1.5 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;}
+.wrap{max-width:1020px;margin:0 auto;padding:32px 20px 64px}
+h1{font-size:22px;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:var(--ink2);margin:0 0 6px}
+.meta{color:var(--ink3);font-size:12px;margin:0 0 28px}
+.ok-badge{color:var(--ok);font-weight:600}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;
+color:var(--ink2);margin:34px 0 12px;font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.tile .k{font-size:12px;color:var(--ink2)}
+.tile .v{font-size:24px;font-weight:650;letter-spacing:-.02em;margin:4px 0 2px}
+.tile .s{font-size:12px;color:var(--ink3)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.row{display:flex;align-items:center;gap:12px;margin:9px 0}
+.lbl{flex:0 0 268px;font-size:13px;color:var(--ink2)}
+.track{flex:1;height:16px;background:transparent;position:relative}
+.fill{position:absolute;left:0;top:0;height:16px;border-radius:0 4px 4px 0;
+box-shadow:0 0 0 2px var(--surface)}
+.val{flex:0 0 72px;text-align:right;font-variant-numeric:tabular-nums;
+font-size:13px;color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-weight:600;color:var(--ink2);font-size:12px;
+text-transform:uppercase;letter-spacing:.04em;padding:6px 10px 6px 0;
+border-bottom:1px solid var(--line)}
+td{padding:7px 10px 7px 0;border-bottom:1px solid var(--line);
+font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+.bad{color:var(--bad);font-weight:600}.ok{color:var(--ok);font-weight:600}
+.note{color:var(--ink3);font-size:12px;margin-top:10px}
+.scroll{overflow-x:auto}
+</style></head><body><div class="wrap">
+<h1>Payment failure recovery agent</h1>
+<p class="sub">Kettle &amp; Co &middot; 200 failed payments &middot; policy v1.2 &middot; seed 42</p>
+<p class="meta">Generated 2026-09-05T20:20:16 &middot; <span class="ok-badge">audit chain intact, no orphans</span></p>
+
+<div class="tiles"><div class="tile"><div class="k">Value at risk</div><div class="v">Rs 703,533</div><div class="s">200 failed payments</div></div><div class="tile"><div class="k">Agent recovered</div><div class="v">Rs 133,519</div><div class="s">18.98% of value at risk</div></div><div class="tile"><div class="k">Rupees per attempt</div><div class="v">Rs 661</div><div class="s">naive: Rs 520</div></div><div class="tile"><div class="k">Policy checks logged</div><div class="v">1,396</div><div class="s">naive_retry: 0</div></div></div>
+
+<h2>Recovery rate by arm</h2>
+<div class="card"><div class="row"><span class="lbl">do_nothing</span><span class="track"><span class="fill" style="width:1.5%;background:#2a78d6"></span></span><span class="val">0%</span></div><div class="row"><span class="lbl">naive_retry</span><span class="track"><span class="fill" style="width:100.0%;background:#eb6834"></span></span><span class="val">36%</span></div><div class="row"><span class="lbl">agent</span><span class="track"><span class="fill" style="width:52.3%;background:#1baf7a"></span></span><span class="val">19%</span></div>
+<p class="note">All three arms run against the identical seeded batch and the identical
+oracle. do_nothing is the counterfactual: no actions, no recovery.</p></div>
+
+<h2>Attempts spent</h2>
+<div class="card"><div class="row"><span class="lbl">do_nothing</span><span class="track"><span class="fill" style="width:1.5%;background:#2a78d6"></span></span><span class="val">0</span></div><div class="row"><span class="lbl">naive_retry</span><span class="track"><span class="fill" style="width:100.0%;background:#eb6834"></span></span><span class="val">491</span></div><div class="row"><span class="lbl">agent</span><span class="track"><span class="fill" style="width:41.1%;background:#1baf7a"></span></span><span class="val">202</span></div>
+<p class="note">Fewer attempts is better for the same recovery: every attempt costs a
+gateway fee and a little customer patience.</p></div>
+
+<h2>Actions the policy engine blocked</h2>
+<div class="card"><div class="row"><span class="lbl">B4 &middot; No attempt more than 72h after failure</span><span class="track"><span class="fill" style="width:100.0%;background:#4a3aa7"></span></span><span class="val">49</span></div><div class="row"><span class="lbl">B2 &middot; Max 1 customer nudge per customer per rolling </span><span class="track"><span class="fill" style="width:34.7%;background:#4a3aa7"></span></span><span class="val">17</span></div><div class="row"><span class="lbl">G7 &middot; TRANSIENT_GATEWAY: max 2 immediate retries</span><span class="track"><span class="fill" style="width:22.4%;background:#4a3aa7"></span></span><span class="val">11</span></div><div class="row"><span class="lbl">B5 &middot; Above Rs 25,000 propose only, never auto-execu</span><span class="track"><span class="fill" style="width:16.3%;background:#4a3aa7"></span></span><span class="val">8</span></div><div class="row"><span class="lbl">S5 &middot; Customer opted out of communication</span><span class="track"><span class="fill" style="width:6.1%;background:#4a3aa7"></span></span><span class="val">3</span></div>
+<p class="note">Each bar is a rule in policy.md that denied a proposed action, counted
+from the policy_checks table. naive_retry consults no policy and writes no checks.</p></div>
+
+<h2>Policy violations by arm</h2>
+<div class="card scroll"><table>
+<tr><th>Violation</th><th>naive_retry</th><th>agent</th></tr>
+<tr><td>G2 attempted a risk decline</td><td class="bad">33</td><td class="ok">3</td></tr><tr><td>G1 attempted a dead instrument</td><td class="bad">84</td><td class="ok">5</td></tr><tr><td>G3 attempted an unmapped code</td><td class="bad">33</td><td class="ok">6</td></tr></table>
+<p class="note">Payment attempts on payments that could never succeed, counted against
+simulator ground truth after the fact. The agent&rsquo;s remaining attempts all trace to
+misdiagnosis: rules-only classification reads a misleading error code, and the policy
+engine can only gate on what it was told. The G1-permitted instrument-update nudge is
+excluded &mdash; it is allowed, not a violation.</p></div>
+
+<h2>Full comparison</h2>
+<div class="card scroll"><table>
+<tr><th>Arm</th><th>At risk</th><th>Recovered</th><th>Rate</th><th>Paid</th>
+<th>Attempts</th><th>Per attempt</th><th>Exceptions</th></tr>
+<tr><td>do_nothing</td><td>200</td><td>Rs 0</td><td>0%</td><td>0</td><td>0</td><td>Rs 0</td><td>0</td></tr><tr><td>naive_retry</td><td>200</td><td>Rs 255,494</td><td>36.32%</td><td>77</td><td>491</td><td>Rs 520</td><td>0</td></tr><tr><td>agent</td><td>200</td><td>Rs 133,519</td><td>18.98%</td><td>46</td><td>202</td><td>Rs 661</td><td>52</td></tr></table></div>
+
+<h2>Exceptions we could not resolve</h2>
+<div class="card scroll"><table>
+<tr><th>Reason</th><th>Payments</th><th>Value</th></tr>
+<tr><td>NEEDS_HUMAN_APPROVAL</td><td>21</td><td>Rs 173,723</td></tr><tr><td>RISK_DECLINE</td><td>18</td><td>Rs 50,239</td></tr><tr><td>UNKNOWN_ERROR_CODE</td><td>13</td><td>Rs 62,879</td></tr></table>
+<p class="note">These are surfaced, not hidden. Every one is a payment the agent
+declined to act on and handed to a human.</p></div>
+</div>
+<script type="application/json" id="results">{"generated_at": "2026-09-05T20:20:16", "integrity": ["audit chain intact, no orphans"], "arms": [{"arm": "do_nothing", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 0, "rate_pct": 0.0, "recovered_n": 0, "attempts": 0, "exceptions": 0, "per_attempt": 0}, {"arm": "naive_retry", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 25549430, "rate_pct": 36.32, "recovered_n": 77, "attempts": 491, "exceptions": 0, "per_attempt": 520.0}, {"arm": "agent", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 13351880, "rate_pct": 18.98, "recovered_n": 46, "attempts": 202, "exceptions": 52, "per_attempt": 661.0}], "blocked": [{"rule_id": "B4", "desc": "No attempt more than 72h after failure", "count": 49}, {"rule_id": "B2", "desc": "Max 1 customer nudge per customer per rolling 24h", "count": 17}, {"rule_id": "G7", "desc": "TRANSIENT_GATEWAY: max 2 immediate retries", "count": 11}, {"rule_id": "B5", "desc": "Above Rs 25,000 propose only, never auto-execute", "count": 8}, {"rule_id": "S5", "desc": "Customer opted out of communication", "count": 3}], "exceptions": [{"code": "NEEDS_HUMAN_APPROVAL", "count": 21, "amount_paise": 17372254}, {"code": "RISK_DECLINE", "count": 18, "amount_paise": 5023861}, {"code": "UNKNOWN_ERROR_CODE", "count": 13, "amount_paise": 6287920}], "violations": {"G2 attempted a risk decline": [33, 3], "G1 attempted a dead instrument": [84, 5], "G3 attempted an unmapped code": [33, 6]}, "diagnosis": [{"source": "rules", "count": 382}], "checks_written": 1396}</script>
+</body></html>
