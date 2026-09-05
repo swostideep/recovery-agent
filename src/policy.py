@@ -306,10 +306,21 @@ def evaluate(ctx):
 
     if denied:
         return "deny", ctx["params"], checks
-    if ctx["action"] not in ATTEMPT_ACTIONS:
-        return "allow", ctx["params"], checks
+    if ctx["action"] in ("ESCALATE_HUMAN", "STOP"):
+        return "allow", ctx["params"], checks   # not money, no timing to gate
 
     proposed = ctx["params"].get("at", ctx["now"])
+    if ctx["action"] not in ATTEMPT_ACTIONS:
+        # A nudge is not a payment attempt, so the G-floors and the B4 ceiling
+        # do not apply -- but G1 makes it subject to B3, so quiet hours do.
+        shifted, quiet_why = _next_open(proposed)
+        if quiet_why:
+            log("B3", "No action executes 21:00-09:00 IST", "allow", quiet_why)
+            params = dict(ctx["params"])
+            params["at"] = shifted
+            return "clamp", params, checks
+        return "allow", ctx["params"], checks
+
     hard, preferred, floor_rule, why = earliest_permitted(ctx)
     ceiling = _failed_at(ctx) + timedelta(hours=B4_WINDOW_HOURS)
     final = max(proposed, preferred)
