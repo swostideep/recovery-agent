@@ -1,4 +1,4 @@
-# Recovery Policy — v1.2
+# Recovery Policy — v1.3
 
 Merchant: "Kettle & Co", D2C ecommerce (India). AOV ~₹2,400.
 Actor: automated recovery agent. All amounts in paise (integers).
@@ -38,8 +38,11 @@ Failures are classified into exactly one class before any action is considered.
 - **P1** Bounded limits (B) and stopping rules (S) are absolute. Gating rules
   (G) and heuristics may only narrow what B and S permit, never widen it.
 - **P2** Where a heuristic proposes a time outside a bound, the action is
-  clamped to the latest feasible time inside the bound. If no feasible time
-  exists, the payment goes terminal with `expired`.
+  clamped to the earliest feasible time inside the bound. If no feasible
+  time exists, the payment goes terminal with `expired`.
+  Changed from `latest` to `earliest` in v1.3: clamping to the latest
+  feasible moment put every retry at the 72h edge, after customer intent
+  had decayed, and left no room for a second attempt.
 - **P3** Every clamp or precedence resolution is logged as its own
   policy_checks row with rule_id `P2` and both rule IDs named in the reason.
 - **P4** The policy engine returns exactly one of `allow` | `deny` | `clamp`.
@@ -83,7 +86,7 @@ Failures are classified into exactly one class before any action is considered.
   further 18h gap. Salary-cycle heuristic: if failure falls on days 25–31,
   prefer scheduling to the 1st or 2nd of the next month — but only if that
   time falls within the B4 72h window (P2). If it does not, schedule at the
-  latest B4-feasible time instead and log the clamp.
+  earliest B4-feasible time instead and log the clamp.
 - **G6** AUTH_TIMEOUT → no silent retry. Customer must act, so NUDGE_CUSTOMER
   or SWITCH_RAIL only.
 - **G7** TRANSIENT_GATEWAY → RETRY_NOW allowed, max 2 times, exponential

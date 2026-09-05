@@ -258,16 +258,12 @@ def earliest_permitted(ctx):
     return hard, preferred, rule, why
 
 
-def _latest_feasible(ceiling, hard):
-    """P2: the latest moment at or before the B4 ceiling that B3 also permits.
-    None when the bound and quiet hours leave nothing above `hard`."""
-    ist = to_ist(ceiling)
-    if 9 <= ist.hour < 21:
-        candidate = ceiling
-    else:
-        day = ist if ist.hour >= 21 else ist - timedelta(days=1)
-        candidate = day.replace(hour=20, minute=59, second=0, microsecond=0)
-    return candidate if candidate >= hard else None
+def _clamp_into_bound(ceiling, hard):
+    """P2 (v1.3): the EARLIEST moment inside the B4 ceiling that B3 also
+    permits. Clamping to the latest moment instead put every retry at the 72h
+    edge, after intent had decayed, with no room for a second attempt."""
+    candidate, _ = _next_open(hard)
+    return candidate if candidate <= ceiling else None
 
 
 def _failed_at(ctx):
@@ -340,7 +336,7 @@ def evaluate(ctx):
         return "deny", ctx["params"], checks
 
     if final > ceiling:
-        candidate = _latest_feasible(ceiling, hard)
+        candidate = _clamp_into_bound(ceiling, hard)
         if candidate is None:
             log("B4", "No attempt more than 72h after failure", "deny",
                 f"{floor_rule or 'proposal'} vs B4: nothing feasible inside the"

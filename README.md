@@ -4,22 +4,30 @@ An agent that diagnoses failed payments and recovers them **within a written
 policy it cannot override**. Merchant: "Kettle & Co", D2C ecommerce, India.
 
 ```
-python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
-python3 src/runner.py          # all three arms, ~20s
-python3 src/report.py          # writes results.json + dashboard.html
+python3 src/runner.py                              # all three arms, ~15s
+python3 src/report.py                              # results.json + dashboard.html
+python3 -m unittest discover -s tests -t tests     # 75 tests, ~5s
 ```
 
-No API key, no network, no Docker. Every number below reproduces from `seed=42`.
+**No install step.** The agent, simulator, policy engine and tests run on the
+Python 3.9+ standard library alone — no API key, no network, no Docker, no pip.
+`requirements.txt` lists only the optional `anthropic` SDK for the LLM path that
+ships disabled. Every number below reproduces from `seed=42`.
+
+The 75 tests are the evidence for every claim in this README: the append-only
+trigger, the forged-row detection, the circuit breaker, the P2 clamp, the C4
+fallback, and the end-to-end invariants (no quiet-hours action, no attempt past
+B1, no auto-execute above B5, no orphan action).
 
 ## Bounded
 
 The agent proposes; `policy.py` decides. Limits are absolute and enforced in
-code, not prompts. Across 200 payments the engine denied **86 proposed actions**:
+code, not prompts. Across 200 payments the engine denied **49 proposed actions**:
 
 | Rule | Denied | What it stopped |
 |---|---|---|
-| B4 | 49 | retry more than 72h after failure |
 | B2 | 15 | a second nudge to the same customer inside 24h |
+| B4 | 12 | retry more than 72h after failure |
 | G7 | 11 | a third immediate retry on a transient failure |
 | B5 | 8 | auto-executing above Rs 25,000 |
 | S5 | 3 | messaging a customer who opted out |
@@ -48,7 +56,7 @@ blocked is counted.
 ## Audit Trail
 
 `audit_log` is append-only, enforced by SQL triggers, and hash-chained row to
-row. 413 events, 379 decisions, 1,413 policy checks — each check naming its
+row. 450 events, 411 decisions, 1,540 policy checks — each check naming its
 rule ID, result and reason.
 
 ```
@@ -75,7 +83,7 @@ Three arms, identical seeded batch, identical oracle:
 |---|---|---|---|---|---|
 | do_nothing | Rs 0 | 0% | 0 | 0 | — |
 | naive_retry | Rs 255,494 | 36.32% | 77 | 491 | Rs 520 |
-| agent | Rs 134,922 | 19.18% | 47 | 202 | Rs 668 |
+| agent | Rs 144,196 | 20.5% | 52 | 271 | Rs 532 |
 
 **The agent recovers less gross revenue than naive retry, and that is the
 honest result.** Naive retry wins on volume by doing things the policy forbids:
@@ -83,15 +91,20 @@ honest result.** Naive retry wins on volume by doing things the policy forbids:
 | | naive_retry | agent |
 |---|---|---|
 | Attempts on a risk decline (G2) | 33 | 3 |
-| Attempts on a dead instrument (G1) | 84 | 5 |
+| Attempts on a dead instrument (G1) | 84 | 7 |
 | Attempts on an unmapped code (G3) | 33 | 6 |
 | Actions inside quiet hours (B3) | 248 | **0** |
-| Policy checks written | 0 | 1,413 |
+| Policy checks written | 0 | 1,540 |
 
-The agent recovers **28% more per attempt** (Rs 668 vs Rs 520) with 59% fewer
-attempts and 90% fewer forbidden attempts. A merchant who cannot retry a risk
-decline without damaging their issuer relationship cannot deploy naive retry at
-any recovery rate.
+**Zero quiet-hours actions is the cleanest result here** — 248 for naive retry,
+and the end-to-end test asserts it stays zero. The agent also makes 89% fewer
+forbidden attempts (16 vs 150) and still edges naive on rupees per attempt
+(Rs 532 vs Rs 520) using 45% fewer attempts.
+
+A merchant who retries a risk decline damages their issuer relationship
+regardless of what it recovers. That is the trade this project is measuring: the
+constrained agent gives up gross revenue to stay inside a policy it cannot
+override, and the cost of that constraint is stated rather than hidden.
 
 ## Exceptions We Could Not Resolve
 
@@ -103,8 +116,9 @@ any recovery rate.
 | RISK_DECLINE | 18 | Rs 50,239 |
 | UNKNOWN_ERROR_CODE | 13 | Rs 62,879 |
 
-Plus 49 `expired` (B4 ran out), 29 `exhausted` (B1), 24 `unrecoverable`
-(dead instrument). Nothing is silently dropped.
+Plus 61 `exhausted` (B1 attempt cap), 24 `unrecoverable` (dead instrument), and
+12 `expired` (B4 ran out). Nothing is silently dropped: every one of the 200
+payments reaches a terminal state, and a test asserts it.
 
 ## Failure Handled Gracefully
 
@@ -143,13 +157,24 @@ rather than a pure win. **Every one of the agent's 14 remaining forbidden
 attempts traces to a misdiagnosis**, not to a policy failure: the engine can only
 gate on what it was told. This is the honest case for adding an LLM.
 
-**P2 clamps to the latest feasible time, which costs recovery.** G5's
-salary-cycle heuristic proposes the 1st of the month; B4 caps at 72h; P2 clamps
-to the latest moment inside the bound. INSUFFICIENT_FUNDS retries therefore land
-a mean of 66.3h after failure, when customer intent has decayed. Clamping to the
-*earliest* feasible time instead recovers Rs 142,792 (20.3%) and drops expired
-payments from 49 to 12. The policy as written says "latest", so the agent does
-"latest" — the fix is a one-word change to policy.md, not to the code.
+**P2's clamp direction was wrong in v1.2, and fixing it cost something.** G5's
+salary-cycle heuristic proposes the 1st of the month; B4 caps at 72h. v1.2
+clamped to the *latest* feasible moment, so INSUFFICIENT_FUNDS retries landed a
+mean of 66.3h after failure — after customer intent had decayed, with no room
+for a second attempt. 43 of 49 expired payments came from that single path.
+v1.3 clamps to the *earliest* feasible moment instead:
+
+| P2 direction | Recovered | Rate | Expired | Attempts | Per attempt |
+|---|---|---|---|---|---|
+| latest (v1.2) | Rs 134,922 | 19.18% | 49 | 202 | Rs 668 |
+| earliest (v1.3) | Rs 144,196 | 20.5% | 12 | 271 | Rs 532 |
+
+This is a genuine trade, not a free win: recovering Rs 9,274 more and rescuing
+37 payments from expiry costs 69 extra attempts, which drops rupees-per-attempt
+from Rs 668 to Rs 532 and nearly erases the efficiency margin over naive retry.
+v1.3 is shipped because a rule that deliberately retries at the last possible
+moment is hard to defend on its merits, but the v1.2 numbers are kept here so
+the trade is visible.
 
 **The audit log is single-writer.** `append_event` takes `seq` as `MAX(seq)+1`
 inside `BEGIN IMMEDIATE` because the hash covers `seq`, so the log cannot be

@@ -74,7 +74,8 @@ def collect(conn):
 
 
 def bar(label, value, maximum, colour, suffix=""):
-    pct = 0 if not maximum else max(1.5, 100 * value / maximum)
+    # A zero renders as nothing: a minimum-width stub would read as "a little".
+    pct = 0 if not maximum or not value else max(1.5, 100 * value / maximum)
     return (f'<div class="row"><span class="lbl">{label}</span>'
             f'<span class="track"><span class="fill" style="width:{pct:.1f}%;'
             f'background:{colour}"></span></span>'
@@ -106,7 +107,7 @@ def render(data):
                        for a in arms)
     max_deny = max((b["count"] for b in data["blocked"]), default=1)
     deny_bars = "".join(
-        bar(f'{b["rule_id"]} &middot; {b["desc"][:46]}', b["count"], max_deny, "#4a3aa7")
+        bar(f'{b["rule_id"]} &middot; {b["desc"]}', b["count"], max_deny, "#4a3aa7")
         for b in data["blocked"])
 
     arm_rows = "".join(
@@ -129,6 +130,7 @@ def render(data):
                          ("ARM_ROWS", arm_rows), ("EXC_ROWS", exc_rows),
                          ("VIO_ROWS", vio_rows), ("INTEGRITY", integrity),
                          ("GENERATED", data["generated_at"]),
+                         ("POLICY_VERSION", data["policy_version"]),
                          ("PAYLOAD", json.dumps(data))):
         html = html.replace("__%s__" % token, str(value))
     return html
@@ -137,6 +139,8 @@ def render(data):
 def main(db=None):
     conn = audit.get_conn(db or audit.DB_PATH)
     data = collect(conn)
+    with open(os.path.join(ROOT, "policy.md")) as f:
+        data["policy_version"] = f.readline().strip().split("—")[-1].strip()
     with open(os.path.join(ROOT, "results.json"), "w") as f:
         json.dump(data, f, indent=2)
     with open(os.path.join(ROOT, "dashboard.html"), "w") as f:
@@ -191,7 +195,7 @@ tr:last-child td{border-bottom:none}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap">
 <h1>Payment failure recovery agent</h1>
-<p class="sub">Kettle &amp; Co &middot; 200 failed payments &middot; policy v1.2 &middot; seed 42</p>
+<p class="sub">Kettle &amp; Co &middot; 200 failed payments &middot; policy __POLICY_VERSION__ &middot; seed 42</p>
 <p class="meta">Generated __GENERATED__ &middot; <span class="ok-badge">__INTEGRITY__</span></p>
 
 <div class="tiles">__TILES__</div>
