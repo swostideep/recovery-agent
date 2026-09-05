@@ -64,6 +64,19 @@ def collect(conn):
                 f" AND json_extract(p.latent_json,'$.true_cause')={clause}",
                 (f"{arm}-42",)).fetchone()[0] for arm in ("naive_retry", "agent")]
 
+    for arm in ("naive_retry", "agent"):
+        rows = conn.execute(
+            "SELECT a.executed_at FROM actions a JOIN decisions d"
+            " ON d.decision_id=a.decision_id WHERE d.run_id=?"
+            " AND a.outcome IN ('success','fail') AND a.action_type IN"
+            " ('RETRY_NOW','RETRY_SCHEDULED','SWITCH_RAIL','NUDGE_CUSTOMER')",
+            (f"{arm}-42",)).fetchall()
+        quiet = sum(1 for (t,) in rows
+                    if datetime.fromisoformat(t).hour >= 21
+                    or datetime.fromisoformat(t).hour < 9)
+        data.setdefault("quiet_hours", []).append(quiet)
+        data.setdefault("actions_total", []).append(len(rows))
+
     for source, n in conn.execute(
             "SELECT diagnosis_source, COUNT(*) FROM decisions WHERE run_id='agent-42'"
             " GROUP BY 1"):
@@ -88,13 +101,19 @@ def render(data):
     naive = next(a for a in arms if a["arm"] == "naive_retry")
     at_risk = agent["value_paise"] / 100
 
-    tiles = [("Value at risk", f"Rs {at_risk:,.0f}", f"{agent['at_risk']} failed payments"),
-             ("Agent recovered", f"Rs {agent['recovered_paise']/100:,.0f}",
-              f"{agent['rate_pct']}% of value at risk"),
-             ("Rupees per attempt", f"Rs {agent['per_attempt']:,.0f}",
-              f"naive: Rs {naive['per_attempt']:,.0f}"),
+    vio = [sum(v[0] for v in data["violations"].values()),
+           sum(v[1] for v in data["violations"].values())]
+    quiet = data["quiet_hours"]
+    # Lead with what the constraint bought, not with the gross-recovery
+    # comparison the agent deliberately loses.
+    tiles = [("Actions in customer quiet hours", f"{quiet[1]}",
+              f"naive_retry: {quiet[0]} of {data['actions_total'][0]}"),
+             ("Attempts policy forbids", f"{vio[1]}", f"naive_retry: {vio[0]}"),
              ("Policy checks logged", f"{data['checks_written']:,}",
-              "naive_retry: 0")]
+              "naive_retry: 0"),
+             ("Recovered of Rs %s at risk" % f"{at_risk:,.0f}",
+              f"Rs {agent['recovered_paise']/100:,.0f}",
+              f"{agent['rate_pct']}% &middot; naive_retry {naive['rate_pct']}%")]
     tile_html = "".join(
         f'<div class="tile"><div class="k">{k}</div><div class="v">{v}</div>'
         f'<div class="s">{s}</div></div>' for k, v, s in tiles)
@@ -192,38 +211,48 @@ font-variant-numeric:tabular-nums}
 tr:last-child td{border-bottom:none}
 .bad{color:var(--bad);font-weight:600}.ok{color:var(--ok);font-weight:600}
 .note{color:var(--ink3);font-size:12px;margin-top:10px}
+.lede{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 20px;color:var(--ink2);max-width:none}
+.lede strong{color:var(--ink)}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap">
 <h1>Payment failure recovery agent</h1>
 <p class="sub">Kettle &amp; Co &middot; 200 failed payments &middot; policy __POLICY_VERSION__ &middot; seed 42</p>
 <p class="meta">Generated __GENERATED__ &middot; <span class="ok-badge">__INTEGRITY__</span></p>
 
+<p class="lede">This agent recovers <strong>less</strong> gross revenue than an
+unconstrained retry loop &mdash; and that is the measurement. Naive retry gets its
+higher number by acting 248 times inside customer quiet hours, retrying 33 risk
+declines and 84 dead cards. Every action below was checked against a written
+policy the agent cannot override, and every refusal was logged.</p>
+
 <div class="tiles">__TILES__</div>
 
-<h2>Recovery rate by arm</h2>
-<div class="card">__RATE_BARS__
-<p class="note">All three arms run against the identical seeded batch and the identical
-oracle. do_nothing is the counterfactual: no actions, no recovery.</p></div>
-
-<h2>Attempts spent</h2>
-<div class="card">__ATT_BARS__
-<p class="note">Fewer attempts is better for the same recovery: every attempt costs a
-gateway fee and a little customer patience.</p></div>
+<h2>What the policy prevented</h2>
+<div class="card scroll"><table>
+<tr><th>Payment attempts on payments that could never succeed</th>
+<th>naive_retry</th><th>agent</th></tr>
+__VIO_ROWS__</table>
+<p class="note">Counted against simulator ground truth after the fact. The agent&rsquo;s
+16 remaining attempts all trace to <em>misdiagnosis</em>, not to a policy failure: the
+engine can only gate on what diagnosis told it. The G1-permitted instrument-update
+nudge is excluded &mdash; it is allowed, not a violation.</p></div>
 
 <h2>Actions the policy engine blocked</h2>
 <div class="card">__DENY_BARS__
 <p class="note">Each bar is a rule in policy.md that denied a proposed action, counted
 from the policy_checks table. naive_retry consults no policy and writes no checks.</p></div>
 
-<h2>Policy violations by arm</h2>
-<div class="card scroll"><table>
-<tr><th>Violation</th><th>naive_retry</th><th>agent</th></tr>
-__VIO_ROWS__</table>
-<p class="note">Payment attempts on payments that could never succeed, counted against
-simulator ground truth after the fact. The agent&rsquo;s remaining attempts all trace to
-misdiagnosis: rules-only classification reads a misleading error code, and the policy
-engine can only gate on what it was told. The G1-permitted instrument-update nudge is
-excluded &mdash; it is allowed, not a violation.</p></div>
+<h2>Recovery rate by arm</h2>
+<div class="card">__RATE_BARS__
+<p class="note">All three arms run against the identical seeded batch and the identical
+oracle. do_nothing is the counterfactual: no actions, no recovery. The agent gives up
+gross revenue to stay inside policy &mdash; a merchant who retries a risk decline damages
+their issuer relationship regardless of what it recovers.</p></div>
+
+<h2>Attempts spent</h2>
+<div class="card">__ATT_BARS__
+<p class="note">Fewer attempts is better for the same recovery: every attempt costs a
+gateway fee and a little customer patience.</p></div>
 
 <h2>Full comparison</h2>
 <div class="card scroll"><table>

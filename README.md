@@ -6,7 +6,7 @@ policy it cannot override**. Merchant: "Kettle & Co", D2C ecommerce, India.
 ```
 python3 src/runner.py                              # all three arms, ~15s
 python3 src/report.py                              # results.json + dashboard.html
-python3 -m unittest discover -s tests -t tests     # 75 tests, ~5s
+python3 -m unittest discover -s tests -t tests     # 80 tests, ~5s
 ```
 
 **No install step.** The agent, simulator, policy engine and tests run on the
@@ -14,7 +14,7 @@ Python 3.9+ standard library alone — no API key, no network, no Docker, no pip
 `requirements.txt` lists only the optional `anthropic` SDK for the LLM path that
 ships disabled. Every number below reproduces from `seed=42`.
 
-The 75 tests are the evidence for every claim in this README: the append-only
+The 80 tests are the evidence for every claim in this README: the append-only
 trigger, the forged-row detection, the circuit breaker, the P2 clamp, the C4
 fallback, and the end-to-end invariants (no quiet-hours action, no attempt past
 B1, no auto-execute above B5, no orphan action).
@@ -180,8 +180,23 @@ the trade is visible.
 inside `BEGIN IMMEDIATE` because the hash covers `seq`, so the log cannot be
 written from two processes concurrently.
 
-**The LLM path is untested.** No key was present, the flag is off, and
-`_diagnose_llm` has never executed. Its failure path is tested; the call is not.
+**The LLM path has never made a real API call.** No key was present and the flag
+ships off. Its handling *is* tested — five tests inject a stand-in SDK and assert
+that a valid response is used, and that malformed JSON, a class outside the
+closed set, an API exception, and a missing key each fall back to rules and log
+`diagnosis_source=fallback`. What is unverified is the live network hop and
+whether a real model actually beats rules on the ambiguous payments.
+
+`src/llm_eval.py` measures exactly that, on the ~60 payments where rules report
+low confidence:
+
+```bash
+echo 'ANTHROPIC_API_KEY=sk-ant-...' >> .env
+python3 src/llm_eval.py       # writes llm_eval.json
+```
+
+It reports rules-correct vs LLM-correct on that subset. Submitted metrics are
+unaffected: they are rules-only and reproduce with no key.
 
 **Not implemented:** real delivery of nudges (generated and logged only), live
 Razorpay integration (mocked behind real method signatures), and M1/M2 mandate

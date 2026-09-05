@@ -72,3 +72,79 @@ class C4Fallback(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class LLMPathWithAFakeSDK(unittest.TestCase):
+    """_diagnose_llm never runs in the submitted config. These tests exercise it
+    with an injected stand-in so the request/response handling is not untested
+    code, without needing a key or a network."""
+
+    def setUp(self):
+        import os
+        import sys
+        import types
+        self.saved = sys.modules.get("anthropic")
+        os.environ.setdefault("ANTHROPIC_API_KEY", "test-key-not-real")
+        self.pay = [p for p in BATCH if p["error_code"] in d.AMBIGUOUS][0]
+
+    def tearDown(self):
+        import sys
+        if self.saved is None:
+            sys.modules.pop("anthropic", None)
+        else:
+            sys.modules["anthropic"] = self.saved
+
+    def install(self, text=None, raises=None):
+        import sys
+        import types
+        module = types.ModuleType("anthropic")
+
+        class Messages:
+            def create(inner, **kw):
+                if raises:
+                    raise raises
+                block = types.SimpleNamespace(text=text)
+                return types.SimpleNamespace(content=[block])
+
+        class Anthropic:
+            def __init__(inner, **kw):
+                inner.messages = Messages()
+
+        module.Anthropic = Anthropic
+        sys.modules["anthropic"] = module
+
+    def test_valid_response_is_used(self):
+        self.install(text='{"root_cause":"ISSUER_DOWNTIME","confidence":0.91,'
+                          '"rationale":"issuer wide outage"}')
+        result = d.diagnose(self.pay, NOW, use_llm=True, llm_threshold=0.99)
+        self.assertEqual("llm", result["diagnosis_source"])
+        self.assertEqual("ISSUER_DOWNTIME", result["root_cause"])
+        self.assertEqual(0.91, result["confidence"])
+
+    def test_malformed_json_falls_back(self):
+        self.install(text="I think it's probably the issuer, honestly")
+        result = d.diagnose(self.pay, NOW, use_llm=True, llm_threshold=0.99)
+        self.assertEqual("fallback", result["diagnosis_source"])
+
+    def test_class_outside_the_closed_set_falls_back(self):
+        self.install(text='{"root_cause":"BANK_HOLIDAY","confidence":0.99}')
+        result = d.diagnose(self.pay, NOW, use_llm=True, llm_threshold=0.99)
+        self.assertEqual("fallback", result["diagnosis_source"])
+        self.assertIn(result["root_cause"], d.CAUSE_PRIOR)
+
+    def test_api_exception_falls_back(self):
+        self.install(raises=RuntimeError("529 overloaded"))
+        result = d.diagnose(self.pay, NOW, use_llm=True, llm_threshold=0.99)
+        self.assertEqual("fallback", result["diagnosis_source"])
+        self.assertIn("RuntimeError", result["rationale"])
+
+    def test_a_missing_key_never_raises(self):
+        import os
+        self.install(text='{"root_cause":"ISSUER_DOWNTIME","confidence":0.9}')
+        saved = os.environ.pop("ANTHROPIC_API_KEY", None)
+        try:
+            result = d.diagnose(self.pay, NOW, use_llm=True, llm_threshold=0.99)
+            self.assertEqual("fallback", result["diagnosis_source"])
+        finally:
+            if saved:
+                os.environ["ANTHROPIC_API_KEY"] = saved

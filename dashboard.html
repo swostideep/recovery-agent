@@ -40,38 +40,48 @@ font-variant-numeric:tabular-nums}
 tr:last-child td{border-bottom:none}
 .bad{color:var(--bad);font-weight:600}.ok{color:var(--ok);font-weight:600}
 .note{color:var(--ink3);font-size:12px;margin-top:10px}
+.lede{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 20px;color:var(--ink2);max-width:none}
+.lede strong{color:var(--ink)}
 .scroll{overflow-x:auto}
 </style></head><body><div class="wrap">
 <h1>Payment failure recovery agent</h1>
 <p class="sub">Kettle &amp; Co &middot; 200 failed payments &middot; policy v1.3 &middot; seed 42</p>
-<p class="meta">Generated 2026-09-05T22:41:10 &middot; <span class="ok-badge">audit chain intact, no orphans</span></p>
+<p class="meta">Generated 2026-09-05T22:48:43 &middot; <span class="ok-badge">audit chain intact, no orphans</span></p>
 
-<div class="tiles"><div class="tile"><div class="k">Value at risk</div><div class="v">Rs 703,533</div><div class="s">200 failed payments</div></div><div class="tile"><div class="k">Agent recovered</div><div class="v">Rs 144,196</div><div class="s">20.5% of value at risk</div></div><div class="tile"><div class="k">Rupees per attempt</div><div class="v">Rs 532</div><div class="s">naive: Rs 520</div></div><div class="tile"><div class="k">Policy checks logged</div><div class="v">1,540</div><div class="s">naive_retry: 0</div></div></div>
+<p class="lede">This agent recovers <strong>less</strong> gross revenue than an
+unconstrained retry loop &mdash; and that is the measurement. Naive retry gets its
+higher number by acting 248 times inside customer quiet hours, retrying 33 risk
+declines and 84 dead cards. Every action below was checked against a written
+policy the agent cannot override, and every refusal was logged.</p>
 
-<h2>Recovery rate by arm</h2>
-<div class="card"><div class="row"><span class="lbl">do_nothing</span><span class="track"><span class="fill" style="width:0.0%;background:#2a78d6"></span></span><span class="val">0%</span></div><div class="row"><span class="lbl">naive_retry</span><span class="track"><span class="fill" style="width:100.0%;background:#eb6834"></span></span><span class="val">36%</span></div><div class="row"><span class="lbl">agent</span><span class="track"><span class="fill" style="width:56.4%;background:#1baf7a"></span></span><span class="val">20%</span></div>
-<p class="note">All three arms run against the identical seeded batch and the identical
-oracle. do_nothing is the counterfactual: no actions, no recovery.</p></div>
+<div class="tiles"><div class="tile"><div class="k">Actions in customer quiet hours</div><div class="v">0</div><div class="s">naive_retry: 248 of 491</div></div><div class="tile"><div class="k">Attempts policy forbids</div><div class="v">16</div><div class="s">naive_retry: 150</div></div><div class="tile"><div class="k">Policy checks logged</div><div class="v">1,540</div><div class="s">naive_retry: 0</div></div><div class="tile"><div class="k">Recovered of Rs 703,533 at risk</div><div class="v">Rs 144,196</div><div class="s">20.5% &middot; naive_retry 36.32%</div></div></div>
 
-<h2>Attempts spent</h2>
-<div class="card"><div class="row"><span class="lbl">do_nothing</span><span class="track"><span class="fill" style="width:0.0%;background:#2a78d6"></span></span><span class="val">0</span></div><div class="row"><span class="lbl">naive_retry</span><span class="track"><span class="fill" style="width:100.0%;background:#eb6834"></span></span><span class="val">491</span></div><div class="row"><span class="lbl">agent</span><span class="track"><span class="fill" style="width:55.2%;background:#1baf7a"></span></span><span class="val">271</span></div>
-<p class="note">Fewer attempts is better for the same recovery: every attempt costs a
-gateway fee and a little customer patience.</p></div>
+<h2>What the policy prevented</h2>
+<div class="card scroll"><table>
+<tr><th>Payment attempts on payments that could never succeed</th>
+<th>naive_retry</th><th>agent</th></tr>
+<tr><td>G2 attempted a risk decline</td><td class="bad">33</td><td class="ok">3</td></tr><tr><td>G1 attempted a dead instrument</td><td class="bad">84</td><td class="ok">7</td></tr><tr><td>G3 attempted an unmapped code</td><td class="bad">33</td><td class="ok">6</td></tr></table>
+<p class="note">Counted against simulator ground truth after the fact. The agent&rsquo;s
+16 remaining attempts all trace to <em>misdiagnosis</em>, not to a policy failure: the
+engine can only gate on what diagnosis told it. The G1-permitted instrument-update
+nudge is excluded &mdash; it is allowed, not a violation.</p></div>
 
 <h2>Actions the policy engine blocked</h2>
 <div class="card"><div class="row"><span class="lbl">B2 &middot; Max 1 customer nudge per customer per rolling 24h</span><span class="track"><span class="fill" style="width:100.0%;background:#4a3aa7"></span></span><span class="val">15</span></div><div class="row"><span class="lbl">B4 &middot; No attempt more than 72h after failure</span><span class="track"><span class="fill" style="width:80.0%;background:#4a3aa7"></span></span><span class="val">12</span></div><div class="row"><span class="lbl">G7 &middot; TRANSIENT_GATEWAY: max 2 immediate retries</span><span class="track"><span class="fill" style="width:73.3%;background:#4a3aa7"></span></span><span class="val">11</span></div><div class="row"><span class="lbl">B5 &middot; Above Rs 25,000 propose only, never auto-execute</span><span class="track"><span class="fill" style="width:53.3%;background:#4a3aa7"></span></span><span class="val">8</span></div><div class="row"><span class="lbl">S5 &middot; Customer opted out of communication</span><span class="track"><span class="fill" style="width:20.0%;background:#4a3aa7"></span></span><span class="val">3</span></div>
 <p class="note">Each bar is a rule in policy.md that denied a proposed action, counted
 from the policy_checks table. naive_retry consults no policy and writes no checks.</p></div>
 
-<h2>Policy violations by arm</h2>
-<div class="card scroll"><table>
-<tr><th>Violation</th><th>naive_retry</th><th>agent</th></tr>
-<tr><td>G2 attempted a risk decline</td><td class="bad">33</td><td class="ok">3</td></tr><tr><td>G1 attempted a dead instrument</td><td class="bad">84</td><td class="ok">7</td></tr><tr><td>G3 attempted an unmapped code</td><td class="bad">33</td><td class="ok">6</td></tr></table>
-<p class="note">Payment attempts on payments that could never succeed, counted against
-simulator ground truth after the fact. The agent&rsquo;s remaining attempts all trace to
-misdiagnosis: rules-only classification reads a misleading error code, and the policy
-engine can only gate on what it was told. The G1-permitted instrument-update nudge is
-excluded &mdash; it is allowed, not a violation.</p></div>
+<h2>Recovery rate by arm</h2>
+<div class="card"><div class="row"><span class="lbl">do_nothing</span><span class="track"><span class="fill" style="width:0.0%;background:#2a78d6"></span></span><span class="val">0%</span></div><div class="row"><span class="lbl">naive_retry</span><span class="track"><span class="fill" style="width:100.0%;background:#eb6834"></span></span><span class="val">36%</span></div><div class="row"><span class="lbl">agent</span><span class="track"><span class="fill" style="width:56.4%;background:#1baf7a"></span></span><span class="val">20%</span></div>
+<p class="note">All three arms run against the identical seeded batch and the identical
+oracle. do_nothing is the counterfactual: no actions, no recovery. The agent gives up
+gross revenue to stay inside policy &mdash; a merchant who retries a risk decline damages
+their issuer relationship regardless of what it recovers.</p></div>
+
+<h2>Attempts spent</h2>
+<div class="card"><div class="row"><span class="lbl">do_nothing</span><span class="track"><span class="fill" style="width:0.0%;background:#2a78d6"></span></span><span class="val">0</span></div><div class="row"><span class="lbl">naive_retry</span><span class="track"><span class="fill" style="width:100.0%;background:#eb6834"></span></span><span class="val">491</span></div><div class="row"><span class="lbl">agent</span><span class="track"><span class="fill" style="width:55.2%;background:#1baf7a"></span></span><span class="val">271</span></div>
+<p class="note">Fewer attempts is better for the same recovery: every attempt costs a
+gateway fee and a little customer patience.</p></div>
 
 <h2>Full comparison</h2>
 <div class="card scroll"><table>
@@ -86,5 +96,5 @@ excluded &mdash; it is allowed, not a violation.</p></div>
 <p class="note">These are surfaced, not hidden. Every one is a payment the agent
 declined to act on and handed to a human.</p></div>
 </div>
-<script type="application/json" id="results">{"generated_at": "2026-09-05T22:41:10", "integrity": ["audit chain intact, no orphans"], "arms": [{"arm": "do_nothing", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 0, "rate_pct": 0.0, "recovered_n": 0, "attempts": 0, "exceptions": 0, "per_attempt": 0}, {"arm": "naive_retry", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 25549430, "rate_pct": 36.32, "recovered_n": 77, "attempts": 491, "exceptions": 0, "per_attempt": 520.0}, {"arm": "agent", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 14419609, "rate_pct": 20.5, "recovered_n": 52, "attempts": 271, "exceptions": 51, "per_attempt": 532.0}], "blocked": [{"rule_id": "B2", "desc": "Max 1 customer nudge per customer per rolling 24h", "count": 15}, {"rule_id": "B4", "desc": "No attempt more than 72h after failure", "count": 12}, {"rule_id": "G7", "desc": "TRANSIENT_GATEWAY: max 2 immediate retries", "count": 11}, {"rule_id": "B5", "desc": "Above Rs 25,000 propose only, never auto-execute", "count": 8}, {"rule_id": "S5", "desc": "Customer opted out of communication", "count": 3}], "exceptions": [{"code": "NEEDS_HUMAN_APPROVAL", "count": 20, "amount_paise": 17231885}, {"code": "RISK_DECLINE", "count": 18, "amount_paise": 5023861}, {"code": "UNKNOWN_ERROR_CODE", "count": 13, "amount_paise": 6287920}], "violations": {"G2 attempted a risk decline": [33, 3], "G1 attempted a dead instrument": [84, 7], "G3 attempted an unmapped code": [33, 6]}, "diagnosis": [{"source": "rules", "count": 411}], "checks_written": 1540, "policy_version": "v1.3"}</script>
+<script type="application/json" id="results">{"generated_at": "2026-09-05T22:48:43", "integrity": ["audit chain intact, no orphans"], "arms": [{"arm": "do_nothing", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 0, "rate_pct": 0.0, "recovered_n": 0, "attempts": 0, "exceptions": 0, "per_attempt": 0}, {"arm": "naive_retry", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 25549430, "rate_pct": 36.32, "recovered_n": 77, "attempts": 491, "exceptions": 0, "per_attempt": 520.0}, {"arm": "agent", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 14419609, "rate_pct": 20.5, "recovered_n": 52, "attempts": 271, "exceptions": 51, "per_attempt": 532.0}], "blocked": [{"rule_id": "B2", "desc": "Max 1 customer nudge per customer per rolling 24h", "count": 15}, {"rule_id": "B4", "desc": "No attempt more than 72h after failure", "count": 12}, {"rule_id": "G7", "desc": "TRANSIENT_GATEWAY: max 2 immediate retries", "count": 11}, {"rule_id": "B5", "desc": "Above Rs 25,000 propose only, never auto-execute", "count": 8}, {"rule_id": "S5", "desc": "Customer opted out of communication", "count": 3}], "exceptions": [{"code": "NEEDS_HUMAN_APPROVAL", "count": 20, "amount_paise": 17231885}, {"code": "RISK_DECLINE", "count": 18, "amount_paise": 5023861}, {"code": "UNKNOWN_ERROR_CODE", "count": 13, "amount_paise": 6287920}], "violations": {"G2 attempted a risk decline": [33, 3], "G1 attempted a dead instrument": [84, 7], "G3 attempted an unmapped code": [33, 6]}, "diagnosis": [{"source": "rules", "count": 411}], "quiet_hours": [248, 0], "actions_total": [491, 296], "checks_written": 1540, "policy_version": "v1.3"}</script>
 </body></html>
