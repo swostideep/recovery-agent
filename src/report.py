@@ -155,6 +155,29 @@ def render(data):
     return html
 
 
+ARTIFACT_FONTS = """<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?\
+family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700\
+&display=swap">
+<style>
+body{font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif}
+h1{font-weight:600;letter-spacing:-.02em}
+.tile .v,.val,td,th,.meta{font-family:"IBM Plex Mono","SF Mono",ui-monospace,monospace}
+.tile .v{font-weight:600;letter-spacing:-.03em}
+th{font-weight:500}
+.lbl{font-family:"IBM Plex Mono","SF Mono",ui-monospace,monospace;font-size:12.5px}
+</style>"""
+
+
+def render_artifact(html):
+    """Artifact-ready fragment, derived from the same rendered page so the two
+    can never drift: the host supplies the document wrapper."""
+    title = html[html.index("<title>"):html.index("</title>") + 8]
+    style = html[html.index("<style>"):html.index("</style>") + 8]
+    body = html[html.index("<body>") + 6:html.index("</body>")]
+    return title + "\n" + style + "\n" + ARTIFACT_FONTS + "\n" + body
+
+
 def main(db=None):
     conn = audit.get_conn(db or audit.DB_PATH)
     data = collect(conn)
@@ -162,8 +185,11 @@ def main(db=None):
         data["policy_version"] = f.readline().strip().split("—")[-1].strip()
     with open(os.path.join(ROOT, "results.json"), "w") as f:
         json.dump(data, f, indent=2)
+    html = render(data)
     with open(os.path.join(ROOT, "dashboard.html"), "w") as f:
-        f.write(render(data))
+        f.write(html)
+    with open(os.path.join(ROOT, "dashboard_artifact.html"), "w") as f:
+        f.write(render_artifact(html))
     print(f"  wrote results.json and dashboard.html")
     print(f"  integrity: {'; '.join(data['integrity'])}")
     return data

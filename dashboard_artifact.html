@@ -1,6 +1,3 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Payment Recovery Agent</title>
 <style>
 :root{color-scheme:light;--bg:#f4f4f2;--surface:#fcfcfb;--line:#e2e1dc;
@@ -43,7 +40,18 @@ tr:last-child td{border-bottom:none}
 .lede{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:0 0 20px;color:var(--ink2);max-width:none}
 .lede strong{color:var(--ink)}
 .scroll{overflow-x:auto}
-</style></head><body><div class="wrap">
+</style>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+body{font-family:"IBM Plex Sans",ui-sans-serif,system-ui,sans-serif}
+h1{font-weight:600;letter-spacing:-.02em}
+.tile .v,.val,td,th,.meta{font-family:"IBM Plex Mono","SF Mono",ui-monospace,monospace}
+.tile .v{font-weight:600;letter-spacing:-.03em}
+th{font-weight:500}
+.lbl{font-family:"IBM Plex Mono","SF Mono",ui-monospace,monospace;font-size:12.5px}
+</style>
+<div class="wrap">
 <h1>Payment failure recovery agent</h1>
 <p class="sub">Kettle &amp; Co &middot; 200 failed payments &middot; policy v1.3 &middot; seed 42</p>
 <p class="meta">Generated 2026-09-05T22:52:38 &middot; <span class="ok-badge">audit chain intact, no orphans</span></p>
@@ -97,4 +105,3 @@ gateway fee and a little customer patience.</p></div>
 declined to act on and handed to a human.</p></div>
 </div>
 <script type="application/json" id="results">{"generated_at": "2026-09-05T22:52:38", "integrity": ["audit chain intact, no orphans"], "arms": [{"arm": "do_nothing", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 0, "rate_pct": 0.0, "recovered_n": 0, "attempts": 0, "exceptions": 0, "per_attempt": 0}, {"arm": "naive_retry", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 25549430, "rate_pct": 36.32, "recovered_n": 77, "attempts": 491, "exceptions": 0, "per_attempt": 520.0}, {"arm": "agent", "at_risk": 200, "value_paise": 70353252, "recovered_paise": 14419609, "rate_pct": 20.5, "recovered_n": 52, "attempts": 271, "exceptions": 51, "per_attempt": 532.0}], "blocked": [{"rule_id": "B2", "desc": "Max 1 customer nudge per customer per rolling 24h", "count": 15}, {"rule_id": "B4", "desc": "No attempt more than 72h after failure", "count": 12}, {"rule_id": "G7", "desc": "TRANSIENT_GATEWAY: max 2 immediate retries", "count": 11}, {"rule_id": "B5", "desc": "Above Rs 25,000 propose only, never auto-execute", "count": 8}, {"rule_id": "S5", "desc": "Customer opted out of communication", "count": 3}], "exceptions": [{"code": "NEEDS_HUMAN_APPROVAL", "count": 20, "amount_paise": 17231885}, {"code": "RISK_DECLINE", "count": 18, "amount_paise": 5023861}, {"code": "UNKNOWN_ERROR_CODE", "count": 13, "amount_paise": 6287920}], "violations": {"G2 attempted a risk decline": [33, 3], "G1 attempted a dead instrument": [84, 7], "G3 attempted an unmapped code": [33, 6]}, "diagnosis": [{"source": "rules", "count": 411}], "quiet_hours": [248, 0], "actions_total": [491, 296], "checks_written": 1540, "policy_version": "v1.3"}</script>
-</body></html>
